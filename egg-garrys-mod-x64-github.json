@@ -1,195 +1,185 @@
 {
-    "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO",
-    "meta": {
-        "version": "PTDL_v2",
-        "update_url": null
+  "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": "https://raw.githubusercontent.com/refoseldev/egg-garrysmod-x64-github/main/egg-garrys-mod-x64-github.json"
+  },
+  "exported_at": "2026-09-21T00:12:10+03:00",
+  "name": "Garry's Mod x86-64 + Git",
+  "author": "refoseldev@users.noreply.github.com",
+  "description": "Garry's Mod x86-64 server with optional Git repository deployment, maintained by RefoselDev.",
+  "features": [
+    "gsl_token",
+    "steam_disk_space"
+  ],
+  "docker_images": {
+    "ghcr.io/refoseldev/games:source": "ghcr.io/refoseldev/games:source"
+  },
+  "file_denylist": [],
+  "startup": "./srcds_run_x64 -game garrysmod -console -port {{SERVER_PORT}} +ip 0.0.0.0 +host_workshop_collection {{WORKSHOP_ID}} +map {{SRCDS_MAP}} +gamemode {{GAMEMODE}} -strictportbind -norestart +sv_setsteamaccount {{STEAM_ACC}} +maxplayers {{MAX_PLAYERS}} -tickrate {{TICKRATE}} $( [ \"{{LUA_REFRESH}}\" == \"1\" ] || printf %s \"-disableluarefresh\" )",
+  "config": {
+    "files": "{}",
+    "startup": "{\r\n    \"done\": \"gameserver Steam ID\"\r\n}",
+    "logs": "{}",
+    "stop": "quit"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/bash\r\n\r\nset -Eeuo pipefail\r\n\r\nserver_dir=/mnt/server\r\nsteamcmd_dir=\"${server_dir}/steamcmd\"\r\n\r\napt-get update\r\napt-get install -y --no-install-recommends ca-certificates curl git tar\r\nrm -rf /var/lib/apt/lists/*\r\n\r\nmkdir -p \"${steamcmd_dir}\" \"${server_dir}/steamapps\"\r\ncurl --fail --show-error --location --retry 3 \\\r\n    --output /tmp/steamcmd.tar.gz \\\r\n    https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz\r\ntar -xzf /tmp/steamcmd.tar.gz -C \"${steamcmd_dir}\"\r\nrm -f /tmp/steamcmd.tar.gz\r\n\r\nexport HOME=\"${server_dir}\"\r\n\r\nsteam_user=${STEAM_USER:-anonymous}\r\nsteamcmd_args=(\r\n    +force_install_dir \"${server_dir}\"\r\n    +login \"${steam_user}\" \"${STEAM_PASS:-}\" \"${STEAM_AUTH:-}\"\r\n    +app_update \"${SRCDS_APPID:-4020}\"\r\n    -beta x86-64\r\n)\r\n\r\nif [[ -n \"${EXTRA_FLAGS:-}\" ]]; then\r\n    read -r -a extra_flags <<< \"${EXTRA_FLAGS}\"\r\n    steamcmd_args+=(\"${extra_flags[@]}\")\r\nfi\r\n\r\nsteamcmd_args+=(validate +quit)\r\n\"${steamcmd_dir}/steamcmd.sh\" \"${steamcmd_args[@]}\"\r\n\r\ninstall -D -m 0644 \"${steamcmd_dir}/linux32/steamclient.so\" \"${server_dir}/.steam/sdk32/steamclient.so\"\r\ninstall -D -m 0644 \"${steamcmd_dir}/linux64/steamclient.so\" \"${server_dir}/.steam/sdk64/steamclient.so\"\r\n\r\nmkdir -p \"${server_dir}/garrysmod/lua/autorun/server\" \"${server_dir}/garrysmod/cfg\"\r\n\r\nif [[ ! -f \"${server_dir}/garrysmod/lua/autorun/server/workshop.lua\" ]]; then\r\n    cat > \"${server_dir}/garrysmod/lua/autorun/server/workshop.lua\" <<'LUA'\r\n-- Add individual Workshop addon IDs here when clients must download them.\r\n-- Example: resource.AddWorkshop(\"123456789\")\r\nLUA\r\nfi\r\n\r\nif [[ ! -f \"${server_dir}/garrysmod/cfg/server.cfg\" ]]; then\r\n    cat > \"${server_dir}/garrysmod/cfg/server.cfg\" <<'CFG'\r\nhostname \"Hosted by RefoselDev\"\r\nsv_password \"\"\r\nsv_loadingurl \"\"\r\nsv_downloadurl \"\"\r\n\r\nsv_region \"255\"\r\nsv_lan \"0\"\r\nsv_max_queries_sec_global \"30000\"\r\nsv_max_queries_window \"45\"\r\nsv_max_queries_sec \"5\"\r\n\r\nsbox_maxprops \"100\"\r\nsbox_maxragdolls \"5\"\r\nsbox_maxnpcs \"10\"\r\nsbox_maxballoons \"10\"\r\nsbox_maxeffects \"10\"\r\nsbox_maxdynamite \"10\"\r\nsbox_maxlamps \"10\"\r\nsbox_maxthrusters \"10\"\r\nsbox_maxwheels \"10\"\r\nsbox_maxhoverballs \"10\"\r\nsbox_maxvehicles \"20\"\r\nsbox_maxbuttons \"10\"\r\nsbox_maxsents \"20\"\r\nsbox_maxemitters \"5\"\r\nsbox_godmode \"0\"\r\nsbox_noclip \"0\"\r\n\r\nsv_minrate \"75000\"\r\nsv_maxrate \"0\"\r\ngmod_physiterations \"2\"\r\nnet_splitpacket_maxrate \"45000\"\r\ndecalfrequency \"12\"\r\n\r\nexec banned_ip.cfg\r\nexec banned_user.cfg\r\nCFG\r\nfi\r\n\r\nif [[ \"${AUTO_INSTALL:-0}\" != \"1\" ]]; then\r\n    echo \"Git repository installation is disabled.\"\r\n    exit 0\r\nfi\r\n\r\nif [[ -z \"${GIT_ADDRESS:-}\" ]]; then\r\n    echo \"GIT_ADDRESS must be set when AUTO_INSTALL is enabled.\" >&2\r\n    exit 1\r\nfi\r\n\r\ngit_folder=${GIT_FOLDER:-garrysmod}\r\nif [[ \"${git_folder}\" = /* || \"${git_folder}\" == *..* ]]; then\r\n    echo \"GIT_FOLDER must be a relative path without '..'.\" >&2\r\n    exit 1\r\nfi\r\n\r\ngit_target=\"${server_dir}/${git_folder}\"\r\nmkdir -p \"${git_target}\"\r\n\r\ngit_address=${GIT_ADDRESS}\r\n[[ \"${git_address}\" == *.git ]] || git_address=\"${git_address}.git\"\r\n\r\naskpass=\r\nif [[ -n \"${USERNAME:-}\" && -n \"${ACCESS_TOKEN:-}\" ]]; then\r\n    askpass=$(mktemp)\r\n    cat > \"${askpass}\" <<'ASKPASS'\r\n#!/bin/sh\r\ncase \"$1\" in\r\n    *Username*) printf '%s\\n' \"$GIT_USERNAME\" ;;\r\n    *) printf '%s\\n' \"$GIT_ACCESS_TOKEN\" ;;\r\nesac\r\nASKPASS\r\n    chmod 700 \"${askpass}\"\r\n    export GIT_ASKPASS=\"${askpass}\" GIT_USERNAME=\"${USERNAME}\" GIT_ACCESS_TOKEN=\"${ACCESS_TOKEN}\"\r\n    trap 'rm -f \"${askpass}\"' EXIT\r\nfi\r\n\r\ngit -C \"${git_target}\" init\r\ngit -C \"${git_target}\" remote remove origin 2>/dev/null || true\r\ngit -C \"${git_target}\" remote add origin \"${git_address}\"\r\ngit -C \"${git_target}\" fetch --depth=1 origin \"${BRANCH:-HEAD}\"\r\ngit -C \"${git_target}\" checkout -f -B deployed FETCH_HEAD\r\n\r\necho \"Repository installed into ${git_target}.\"",
+      "container": "ghcr.io/pterodactyl/installers:debian",
+      "entrypoint": "bash"
+    }
+  },
+  "variables": [
+    {
+      "name": "Карта",
+      "description": "Карта при запуске сервера.",
+      "env_variable": "SRCDS_MAP",
+      "default_value": "gm_flatgrass",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|alpha_dash",
+      "field_type": "text"
     },
-    "exported_at": "2024-02-26T19:54:15+00:00",
-    "name": "Garrys Mod X64 Github",
-    "author": "owner@katsuki.digital",
-    "description": "Garrys Mod, is a sandbox physics game created by Garry Newman, and developed by his company, Facepunch Studios.",
-    "features": [
-        "gsl_token",
-        "steam_disk_space"
-    ],
-    "docker_images": {
-        "ghcr.io\/rising-project\/games:source": "ghcr.io\/rising-project\/games:source"
+    {
+      "name": "Steam Account Token",
+      "description": "Токен Аккаунта Steam.",
+      "env_variable": "STEAM_ACC",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string|alpha_num|size:32",
+      "field_type": "text"
     },
-    "file_denylist": [],
-    "startup": "`if [[ -d .git ]] && [[ {{AUTO_GIT_UPDATE}} == \"1\" ]]; then git pull --no-edit > \/dev\/null; fi;` .\/srcds_run_x64 -game garrysmod -console -port {{SERVER_PORT}} +ip 0.0.0.0 +host_workshop_collection {{WORKSHOP_ID}} +map {{SRCDS_MAP}} +gamemode {{GAMEMODE}} -strictportbind -norestart +sv_setsteamaccount {{STEAM_ACC}} +maxplayers {{MAX_PLAYERS}}  -tickrate {{TICKRATE}}  $( [ \"$LUA_REFRESH\" == \"1\" ] || printf %s '-disableluarefresh' )",
-    "config": {
-        "files": "{}",
-        "startup": "{\r\n    \"done\": \"gameserver Steam ID\"\r\n}",
-        "logs": "{}",
-        "stop": "quit"
+    {
+      "name": "Source AppID",
+      "description": "Не модифицировать.",
+      "env_variable": "SRCDS_APPID",
+      "default_value": "4020",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "required|string|max:20",
+      "field_type": "text"
     },
-    "scripts": {
-        "installation": {
-            "script": "#!\/bin\/bash\r\n# steamcmd Base Installation Script\r\n#\r\n# Server Files: \/mnt\/server\r\n\r\n# Install git and others\r\napt-get update\r\napt install -y git curl jq file unzip\r\n\r\ngit version\r\n\r\nexport PATH=\"$PATH:\/mnt\/server\/garrysmod\/.git\"\r\nexport PATH=\"$PATH:\/mnt\/server\/.git\"\r\necho $PATH\r\n\r\n\r\n## just in case someone removed the defaults.\r\nif [ \"${STEAM_USER}\" == \"\" ]; then\r\n    echo -e \"steam user is not set.\\n\"\r\n    echo -e \"Using anonymous user.\\n\"\r\n    STEAM_USER=anonymous\r\n    STEAM_PASS=\"\"\r\n    STEAM_AUTH=\"\"\r\nelse\r\n    echo -e \"user set to ${STEAM_USER}\"\r\nfi\r\n\r\n## download and install steamcmd\r\ncd \/tmp\r\nmkdir -p \/mnt\/server\/steamcmd\r\ncurl -sSL -o steamcmd.tar.gz https:\/\/steamcdn-a.akamaihd.net\/client\/installer\/steamcmd_linux.tar.gz\r\ntar -xzvf steamcmd.tar.gz -C \/mnt\/server\/steamcmd\r\nmkdir -p \/mnt\/server\/steamapps # Fix steamcmd disk write error when this folder is missing\r\ncd \/mnt\/server\/steamcmd\r\n\r\n# SteamCMD fails otherwise for some reason, even running as root.\r\n# This is changed at the end of the install process anyways.\r\nchown -R root:root \/mnt\r\nexport HOME=\/mnt\/server\r\n\r\n## install game using steamcmd\r\n.\/steamcmd.sh +force_install_dir \/mnt\/server +login ${STEAM_USER} ${STEAM_PASS} ${STEAM_AUTH} $( [[ \"${WINDOWS_INSTALL}\" == \"1\" ]] && printf %s '+@sSteamCmdForcePlatformType windows' ) +app_update ${SRCDS_APPID} -beta x86-64 ${EXTRA_FLAGS} validate +quit ## other flags may be needed depending on install. looking at you cs 1.6\r\n\r\n## set up 32 bit libraries\r\nmkdir -p \/mnt\/server\/.steam\/sdk32\r\ncp -v linux32\/steamclient.so ..\/.steam\/sdk32\/steamclient.so\r\n\r\n## set up 64 bit libraries\r\nmkdir -p \/mnt\/server\/.steam\/sdk64\r\ncp -v linux64\/steamclient.so ..\/.steam\/sdk64\/steamclient.so\r\n\r\n# set up css content\r\nif [ \"${AUTO_CSS}\" == \"true\" ] || [ \"${AUTO_CSS}\" == \"1\" ]; then\r\n    echo -e \"Installing css content...\"\r\n    \r\n    cd \/mnt\/server\/\r\n    curl -sSL -o css.tar.gz http:\/\/mail.bogserv.fr\/content\/css.tar.gz\r\n    tar -xzvf css.tar.gz -C \/mnt\/server\/\r\n    rm -f css.tar.gz\r\n    \r\n    cd \/mnt\/server\/garrysmod\/cfg\r\n    echo '\r\n    \r\n    \/\/\r\n    \/\/ Use this file to mount additional paths to the filesystem\r\n    \/\/ The folder you provide must contain either one or more *_dir.vpk files or the usual models\/materials\/etc folders\r\n    \/\/ Lines starting with \/\/ are comments and are ignored by the game\r\n    \/\/ This file will also affect Hammer Editor (hammer.exe)\r\n    \/\/\r\n    \r\n    \/\/ DO NOT add a slash to the end of the filename\r\n    \/\/ DO NOT start lines with \/\/ in between { and }, the 2 lines there are commented out examples and will be ignored by the game\r\n    \r\n    \"mountcfg\"\r\n    {\r\n        \"cstrike\"\t\"\/home\/container\/css\/cstrike\"\r\n    \/\/\t\"tf\"\t\t\"C:\\mytf2server\\tf\"\r\n    }\r\n    \r\n    \/\/ DO NOT start lines with \/\/ in between { and }, the 2 lines there are commented out examples and will be ignored by the game\r\n    ' > mount.cfg\r\nfi\r\n\r\n# Creating needed default files for the game\r\ncd \/mnt\/server\/garrysmod\/lua\/autorun\/server\r\necho '\r\n-- Docs: https:\/\/wiki.garrysmod.com\/page\/resource\/AddWorkshop\r\n-- Place the ID of the workshop addon you want to be downloaded to people who join your server, not the collection ID\r\n-- Use https:\/\/beta.configcreator.com\/create\/gmod\/resources.lua to easily create a list based on your collection ID\r\n\r\nresource.AddWorkshop( \"\" )\r\n' > workshop.lua\r\n\r\ncd \/mnt\/server\/garrysmod\/cfg\r\necho '\r\n\/\/ Please do not set RCon in here, use the startup parameters.\r\n\r\nhostname\t\t\"Hosted by risingproject.ru\"\r\nsv_password\t\t\"\"\r\nsv_loadingurl   \"\"\r\nsv_downloadurl  \"\"\r\n\r\n\/\/ Steam Server List Settings\r\n\/\/ sv_location \"eu\"\r\nsv_region \"255\"\r\nsv_lan \"0\"\r\nsv_max_queries_sec_global \"30000\"\r\nsv_max_queries_window \"45\"\r\nsv_max_queries_sec \"5\"\r\n\r\n\/\/ Server Limits\r\nsbox_maxprops\t\t100\r\nsbox_maxragdolls\t5\r\nsbox_maxnpcs\t\t10\r\nsbox_maxballoons\t10\r\nsbox_maxeffects\t\t10\r\nsbox_maxdynamite\t10\r\nsbox_maxlamps\t\t10\r\nsbox_maxthrusters\t10\r\nsbox_maxwheels\t\t10\r\nsbox_maxhoverballs\t10\r\nsbox_maxvehicles\t20\r\nsbox_maxbuttons\t\t10\r\nsbox_maxsents\t\t20\r\nsbox_maxemitters\t5\r\nsbox_godmode\t\t0\r\nsbox_noclip\t\t    0\r\n\r\n\/\/ Network Settings - Please keep these set to default.\r\n\r\nsv_minrate\t\t75000\r\nsv_maxrate\t\t0\r\ngmod_physiterations\t2\r\nnet_splitpacket_maxrate\t45000\r\ndecalfrequency\t\t12 \r\n\r\n\/\/ Execute Ban Files - Please do not edit\r\nexec banned_ip.cfg \r\nexec banned_user.cfg \r\n\r\n\/\/ Add custom lines under here\r\n' > server.cfg\r\n\r\ncd \/mnt\/server\/\r\n# ^ \u0411\u0435\u0437 \u044d\u0442\u043e\u0439 \u0445\u0443\u0439\u043d\u0438 \u0441\u0432\u0435\u0440\u0445\u0443, \u043d\u0435 \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u0445\u0443\u0439\u043d\u044f \u0441\u043d\u0438\u0437\u0443.\r\n\r\n\r\nif [ \"${AUTO_INSTALL}\" == \"false\" ] || [ \"${AUTO_INSTALL}\" == \"0\" ]; then\r\n    echo -e \"skip auto repository install\"\r\n    exit 0\r\nfi\r\n\r\nif [[ ${GIT_ADDRESS} != *.git ]]; then\r\n    GIT_ADDRESS=${GIT_ADDRESS}.git\r\nfi\r\n\r\nif [ -z \"${USERNAME}\" ] && [ -z \"${ACCESS_TOKEN}\" ]; then\r\n    echo -e \"using anon api call\"\r\nelse\r\n    GIT_ADDRESS=\"https:\/\/${USERNAME}:${ACCESS_TOKEN}@$(echo -e ${GIT_ADDRESS} | cut -d\/ -f3-)\"\r\nfi\r\n\r\nif [ \"${GIT_FOLDER}\" == \"\" ]; then\r\n    echo -e \"git folder not set.\\n\"\r\n    echo -e \"Using main folder.\\n\"\r\n    GIT_FOLDER=\"\/mnt\/server\"\r\nelse\r\n    echo -e \"Set git folder to - \/mnt\/server\/${GIT_FOLDER}\"\r\n    GIT_FOLDER=\"\/mnt\/server\/${GIT_FOLDER}\"\r\nfi\r\n\r\ncd ${GIT_FOLDER}\r\n\r\nif [ \"$(ls -A ${GIT_FOLDER})\" ]; then\r\n    echo -e \"${GIT_FOLDER} directory is not empty.\"\r\n    if [ -d .git ]; then\r\n        echo -e \".git directory exists\"\r\n        if [ -f .git\/config ]; then\r\n            echo -e \"loading info from git config\"\r\n            ORIGIN=$(git config --get remote.origin.url)\r\n        else\r\n            echo -e \"files found with no git config\"\r\n            echo -e \"closing out without touching things to not break anything\"\r\n            exit 10\r\n        fi\r\n    else\r\n        echo \"cloning repository by trick\"\r\n        git init .\r\n        git remote add -t \\* -f origin ${GIT_ADDRESS}\r\n        if [ -z ${BRANCH} ]; then\r\n            echo -e \"cloning default branch\"\r\n            git checkout -f\r\n        else\r\n            echo -e \"cloning ${BRANCH}'\"\r\n            git checkout -f ${BRANCH}\r\n            git pull\r\n        fi\r\n    fi\r\n\r\n    if [ \"${ORIGIN}\" == \"${GIT_ADDRESS}\" ]; then\r\n        echo \"pulling latest from git\"\r\n        git pull\r\n    fi\r\nelse # \u041f\u043e \u0438\u0434\u0435\u0435 \u043f\u0430\u043f\u043a\u0430 \u0432\u043e\u043e\u0431\u0449\u0435 \u043d\u0435 \u043c\u043e\u0436\u0435\u0442 \u0431\u044b\u0442\u044c \u043f\u0443\u0441\u0442\u0430 TODO\r\n    echo -e \"${GIT_FOLDER} is empty.\\ncloning files into repo\"\r\n    if [ -z ${BRANCH} ]; then\r\n        echo -e \"cloning default branch\"\r\n        git clone ${GIT_ADDRESS} .\r\n    else\r\n        echo -e \"cloning ${BRANCH}'\"\r\n        git clone --single-branch --branch ${BRANCH} ${GIT_ADDRESS} .\r\n    fi\r\nfi",
-            "container": "ghcr.io\/pterodactyl\/installers:debian",
-            "entrypoint": "bash"
-        }
+    {
+      "name": "ID Коллекции",
+      "description": "ID вашей коллекции (Цифры в конце URL коллекции.)",
+      "env_variable": "WORKSHOP_ID",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|integer",
+      "field_type": "text"
     },
-    "variables": [
-        {
-            "name": "\u041a\u0430\u0440\u0442\u0430",
-            "description": "\u041a\u0430\u0440\u0442\u0430 \u043f\u0440\u0438 \u0437\u0430\u043f\u0443\u0441\u043a\u0435 \u0441\u0435\u0440\u0432\u0435\u0440\u0430.",
-            "env_variable": "SRCDS_MAP",
-            "default_value": "gm_flatgrass",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|string|alpha_dash",
-            "field_type": "text"
-        },
-        {
-            "name": "Steam Account Token",
-            "description": "\u0422\u043e\u043a\u0435\u043d \u0410\u043a\u043a\u0430\u0443\u043d\u0442\u0430 Steam.",
-            "env_variable": "STEAM_ACC",
-            "default_value": "",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "nullable|string|alpha_num|size:32",
-            "field_type": "text"
-        },
-        {
-            "name": "Source AppID",
-            "description": "\u041d\u0435 \u043c\u043e\u0434\u0438\u0444\u0438\u0446\u0438\u0440\u043e\u0432\u0430\u0442\u044c.",
-            "env_variable": "SRCDS_APPID",
-            "default_value": "4020",
-            "user_viewable": false,
-            "user_editable": false,
-            "rules": "required|string|max:20",
-            "field_type": "text"
-        },
-        {
-            "name": "ID \u041a\u043e\u043b\u043b\u0435\u043a\u0446\u0438\u0438",
-            "description": "ID \u0432\u0430\u0448\u0435\u0439 \u043a\u043e\u043b\u043b\u0435\u043a\u0446\u0438\u0438 (\u0426\u0438\u0444\u0440\u044b \u0432 \u043a\u043e\u043d\u0446\u0435 URL \u043a\u043e\u043b\u043b\u0435\u043a\u0446\u0438\u0438.)",
-            "env_variable": "WORKSHOP_ID",
-            "default_value": "",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "nullable|integer",
-            "field_type": "text"
-        },
-        {
-            "name": "\u0420\u0435\u0436\u0438\u043c",
-            "description": "\u0420\u0435\u0436\u0438\u043c \u0438\u0433\u0440\u044b \u0432\u0430\u0448\u0435\u0433\u043e \u0441\u0435\u0440\u0432\u0435\u0440\u0430",
-            "env_variable": "GAMEMODE",
-            "default_value": "sandbox",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|string",
-            "field_type": "text"
-        },
-        {
-            "name": "\u041c\u0430\u043a\u0441. \u0438\u0433\u0440\u043e\u043a\u043e\u0432",
-            "description": "\u041c\u0430\u043a\u0441\u0438\u043c\u0430\u043b\u044c\u043d\u043e\u0435 \u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e \u0441\u043b\u043e\u0442\u043e\u0432.",
-            "env_variable": "MAX_PLAYERS",
-            "default_value": "32",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|integer|max:128",
-            "field_type": "text"
-        },
-        {
-            "name": "\u0422\u0438\u043a\u0440\u0435\u0439\u0442",
-            "description": "\u0422\u0438\u043a\u0440\u0435\u0439\u0442 - \u0441\u043a\u043e\u0440\u043e\u0441\u0442\u044c \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f \u0441\u043e\u0431\u044b\u0442\u0438\u0439 \u043d\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435.",
-            "env_variable": "TICKRATE",
-            "default_value": "33",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|integer|max:128",
-            "field_type": "text"
-        },
-        {
-            "name": "\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 .lua",
-            "description": "0 = \u0432\u044b\u043a\u043b,\r\n1 = \u0432\u043a\u043b.",
-            "env_variable": "LUA_REFRESH",
-            "default_value": "0",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|boolean",
-            "field_type": "text"
-        },
-        {
-            "name": "Git \u0420\u0435\u043f\u043e\u0437\u0438\u0442\u043e\u0440\u0438\u0439",
-            "description": "Git \u0420\u0435\u043f\u043e\u0437\u0438\u0442\u043e\u0440\u0438\u0439 \u0434\u043b\u044f \u043a\u043b\u043e\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f\r\n\u041f\u0440\u0438\u043c\u0435\u0440: https:\/github.com\/\u041f\u041e\u041b\u042c\u0417\u0412\/\u0420\u0415\u041f",
-            "env_variable": "GIT_ADDRESS",
-            "default_value": "",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "nullable|string",
-            "field_type": "text"
-        },
-        {
-            "name": "Git \u0412\u0435\u0442\u043a\u0430",
-            "description": "\u0412\u0435\u0442\u043a\u0430 \u0434\u043b\u044f \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0438 \u0438 \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f.",
-            "env_variable": "BRANCH",
-            "default_value": "",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "nullable|string",
-            "field_type": "text"
-        },
-        {
-            "name": "\u0410\u0432\u0442\u043e-\u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 GIT",
-            "description": "\u0412\u044b\u0442\u0430\u0441\u043a\u0438\u0432\u0430\u0435\u0442 \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 \u0438\u0437 \u0440\u0435\u043f\u043e\u0437\u0438\u0442\u043e\u0440\u0438\u044f \u043f\u0440\u0438 \u0437\u0430\u043f\u0443\u0441\u043a\u0435\r\n\r\n\u0412\u0440\u0435\u043c\u0435\u043d\u043d\u043e \u043d\u0435 \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442.",
-            "env_variable": "AUTO_GIT_UPDATE",
-            "default_value": "0",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|boolean",
-            "field_type": "text"
-        },
-        {
-            "name": "\u0410\u0432\u0442\u043e-\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430 \u0420\u0435\u043f\u043e\u0437\u0438\u0442\u043e\u0440\u0438\u044f",
-            "description": "\u041a\u043b\u043e\u043d\u0438\u0440\u0443\u0435\u0442 \u0440\u0435\u043f\u043e \u043f\u0440\u0438 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0435.",
-            "env_variable": "AUTO_INSTALL",
-            "default_value": "0",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|boolean",
-            "field_type": "text"
-        },
-        {
-            "name": "Git Username",
-            "description": "Username \u0434\u043b\u044f \u0437\u0430\u0445\u043e\u0434\u0430 \u0432 Github",
-            "env_variable": "USERNAME",
-            "default_value": "",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "nullable|string",
-            "field_type": "text"
-        },
-        {
-            "name": "Git Access Token",
-            "description": "\u041f\u0430\u0440\u043e\u043b\u044c \u0434\u043b\u044f git.\r\n\r\nIt's \u041b\u0443\u0447\u0448\u0435 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c Personal Access Token.\r\n\r\nhttps:\/github.com\/settings\/tokens\r\nhttps:\/gitlab.com\/-\/profile\/personal_access_tokens",
-            "env_variable": "ACCESS_TOKEN",
-            "default_value": "",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "nullable|string",
-            "field_type": "text"
-        },
-        {
-            "name": "\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u044c CSS",
-            "description": "\u0410\u0432\u0442\u043e \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430 CSS \u043a\u043e\u043d\u0442\u0435\u043d\u0442\u0430.",
-            "env_variable": "AUTO_CSS",
-            "default_value": "0",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|boolean",
-            "field_type": "text"
-        },
-        {
-            "name": "Git \u041f\u0430\u043f\u043a\u0430",
-            "description": "\u041a\u043b\u043e\u043d\u0438\u0440\u0443\u0435\u0442 \u0443\u043a\u0430\u0437\u0430\u043d\u043d\u0443\u044e \u043f\u0430\u043f\u043a\u0443.",
-            "env_variable": "GIT_FOLDER",
-            "default_value": "garrysmod",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "nullable|string",
-            "field_type": "text"
-        }
-    ]
+    {
+      "name": "Режим",
+      "description": "Режим игры вашего сервера",
+      "env_variable": "GAMEMODE",
+      "default_value": "sandbox",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|alpha_dash",
+      "field_type": "text"
+    },
+    {
+      "name": "Макс. игроков",
+      "description": "Максимальное количество слотов.",
+      "env_variable": "MAX_PLAYERS",
+      "default_value": "32",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|max:128",
+      "field_type": "text"
+    },
+    {
+      "name": "Тикрейт",
+      "description": "Тикрейт - скорость обновления событий на сервере.",
+      "env_variable": "TICKRATE",
+      "default_value": "33",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|max:128",
+      "field_type": "text"
+    },
+    {
+      "name": "Обновление .lua",
+      "description": "0 = выкл,\r\n1 = вкл.",
+      "env_variable": "LUA_REFRESH",
+      "default_value": "0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|boolean",
+      "field_type": "text"
+    },
+    {
+      "name": "Git Репозиторий",
+      "description": "Git Репозиторий для клонирования\r\nПример: https:/github.com/ПОЛЬЗВ/РЕП",
+      "env_variable": "GIT_ADDRESS",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Git Ветка",
+      "description": "Ветка для установки и обновления.",
+      "env_variable": "BRANCH",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Авто-обновление GIT",
+      "description": "Выполняет git pull --ff-only перед запуском сервера.",
+      "env_variable": "AUTO_GIT_UPDATE",
+      "default_value": "0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|boolean",
+      "field_type": "text"
+    },
+    {
+      "name": "Авто-Установка Репозитория",
+      "description": "Клонирует репо при установке.",
+      "env_variable": "AUTO_INSTALL",
+      "default_value": "0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|boolean",
+      "field_type": "text"
+    },
+    {
+      "name": "Git Username",
+      "description": "Username для захода в Github",
+      "env_variable": "USERNAME",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Git Access Token",
+      "description": "Пароль для git.\r\n\r\nIt's Лучше использовать Personal Access Token.\r\n\r\nhttps:/github.com/settings/tokens\r\nhttps:/gitlab.com/-/profile/personal_access_tokens",
+      "env_variable": "ACCESS_TOKEN",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Git Папка",
+      "description": "Относительный путь внутри сервера, например garrysmod. Абсолютные пути и .. запрещены.",
+      "env_variable": "GIT_FOLDER",
+      "default_value": "garrysmod",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string|max:128",
+      "field_type": "text"
+    }
+  ]
 }

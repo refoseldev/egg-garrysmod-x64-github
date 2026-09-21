@@ -7,7 +7,7 @@ Pterodactyl Egg for a Garry's Mod x86-64 dedicated server, maintained by Refosel
 - installs Steam AppID `4020` from the `x86-64` branch;
 - runs with `ghcr.io/refoseldev/games:source`;
 - optionally deploys server content from a Git repository;
-- optionally updates that repository with `git pull --ff-only` before startup;
+- optionally synchronizes tracked files with the selected remote branch before startup;
 - does not download or mount third-party Counter-Strike: Source content.
 
 Leave `GIT_FOLDER` empty to deploy the repository into the server root (`/home/container`). Set it to a relative path such as `garrysmod` to deploy into a subdirectory.

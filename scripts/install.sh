@@ -97,13 +97,17 @@ if [[ -z "${GIT_ADDRESS:-}" ]]; then
     exit 1
 fi
 
-git_folder=${GIT_FOLDER:-garrysmod}
+git_folder=${GIT_FOLDER:-}
 if [[ "${git_folder}" = /* || "${git_folder}" == *..* ]]; then
     echo "GIT_FOLDER must be a relative path without '..'." >&2
     exit 1
 fi
 
-git_target="${server_dir}/${git_folder}"
+if [[ -n "${git_folder}" ]]; then
+    git_target="${server_dir}/${git_folder}"
+else
+    git_target="${server_dir}"
+fi
 mkdir -p "${git_target}"
 
 git_address=${GIT_ADDRESS}

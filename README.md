@@ -10,6 +10,8 @@ Pterodactyl Egg for a Garry's Mod x86-64 dedicated server, maintained by Refosel
 - optionally updates that repository with `git pull --ff-only` before startup;
 - does not download or mount third-party Counter-Strike: Source content.
 
+Leave `GIT_FOLDER` empty to deploy the repository into the server root (`/home/container`). Set it to a relative path such as `garrysmod` to deploy into a subdirectory.
+
 ## Installation
 
 Import [`egg-garrys-mod-x64-github.json`](egg-garrys-mod-x64-github.json) from the Pterodactyl admin panel, then create a server from the imported Egg.

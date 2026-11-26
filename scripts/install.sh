@@ -110,6 +110,15 @@ else
 fi
 mkdir -p "${git_target}"
 
+# The installer runs as root, but /mnt/server belongs to the container user.
+# Git 2.35+ rejects repositories whose .git is owned by another UID ("dubious
+# ownership"), so trust both the install-time and the runtime path explicitly.
+# (The volume is mounted at /mnt/server here and at /home/container at runtime.)
+git_safe=(
+    -c "safe.directory=${git_target}"
+    -c "safe.directory=${git_target/#${server_dir}//home/container}"
+)
+
 git_address=${GIT_ADDRESS}
 [[ "${git_address}" == *.git ]] || git_address="${git_address}.git"
 
@@ -128,10 +137,17 @@ ASKPASS
     trap 'rm -f "${askpass}"' EXIT
 fi
 
-git -C "${git_target}" init
-git -C "${git_target}" remote remove origin 2>/dev/null || true
-git -C "${git_target}" remote add origin "${git_address}"
-git -C "${git_target}" fetch --depth=1 origin "${BRANCH:-HEAD}"
-git -C "${git_target}" checkout -f -B deployed FETCH_HEAD
+git "${git_safe[@]}" -C "${git_target}" init
+git "${git_safe[@]}" -C "${git_target}" remote remove origin 2>/dev/null || true
+git "${git_safe[@]}" -C "${git_target}" remote add origin "${git_address}"
+git "${git_safe[@]}" -C "${git_target}" fetch --depth=1 origin "${BRANCH:-HEAD}"
+git "${git_safe[@]}" -C "${git_target}" checkout -f -B deployed FETCH_HEAD
+
+# The installer ran as root, so give the checkout back to whoever owns the
+# server volume; otherwise the runtime container (a different UID) keeps
+# tripping over the same "dubious ownership" check.
+if [[ ${EUID} -eq 0 ]]; then
+    chown -R "$(stat -c '%u:%g' "${server_dir}")" "${git_target}"
+fi
 
 echo "Repository installed into ${git_target}."

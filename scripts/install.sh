@@ -2,6 +2,8 @@
 
 set -Eeuo pipefail
 
+echo "[install] egg-garrysmod-x64-github installer v2 (git safe.directory fix)"
+
 server_dir=/mnt/server
 steamcmd_dir="${server_dir}/steamcmd"
 
@@ -112,12 +114,19 @@ mkdir -p "${git_target}"
 
 # The installer runs as root, but /mnt/server belongs to the container user.
 # Git 2.35+ rejects repositories whose .git is owned by another UID ("dubious
-# ownership"), so trust both the install-time and the runtime path explicitly.
-# (The volume is mounted at /mnt/server here and at /home/container at runtime.)
+# ownership"). HOME points into the volume, so this global config is also read
+# by the runtime container (/home/container/.gitconfig) after installation.
+# The per-command -c entries below are a fallback in case that file cannot be
+# written in the installer.
+git config --global --replace-all safe.directory '*'
+
 git_safe=(
     -c "safe.directory=${git_target}"
     -c "safe.directory=${git_target/#${server_dir}//home/container}"
+    -c "safe.directory=*"
 )
+
+echo "[install] $(git --version); running as $(id -u):$(id -g); ${git_target} is owned by $(stat -c '%u:%g' "${git_target}")"
 
 git_address=${GIT_ADDRESS}
 [[ "${git_address}" == *.git ]] || git_address="${git_address}.git"
